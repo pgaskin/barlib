@@ -72,10 +72,6 @@ func (t tagType) String() string {
 	}
 }
 
-type binaryReader interface {
-	readFrom(r io.Reader, c *Client) error
-}
-
 func bwrite(w io.Writer, data ...interface{}) error {
 	for _, v := range data {
 		if propList, ok := v.(map[string]string); ok {
@@ -149,7 +145,7 @@ func bread(r io.Reader, data ...interface{}) error {
 			}
 
 			if tt != t {
-				return fmt.Errorf("Protcol error: Got type %s but expected %s", tt, t)
+				return fmt.Errorf("protcol error: Got type %s but expected %s", tt, t)
 			}
 			continue
 		}
@@ -170,7 +166,7 @@ func bread(r io.Reader, data ...interface{}) error {
 					break
 				} else {
 					if i > len(buf) {
-						return fmt.Errorf("String is too long (max %d bytes)", len(buf))
+						return fmt.Errorf("string is too long (max %d bytes)", len(buf))
 					}
 					i++
 				}
@@ -195,7 +191,7 @@ func bread(r io.Reader, data ...interface{}) error {
 					break
 				}
 				if t != stringTag {
-					return fmt.Errorf("Protcol error: Got type %s but expected %s", t, stringTag)
+					return fmt.Errorf("protcol error: Got type %s but expected %s", t, stringTag)
 				}
 
 				var k, v string
@@ -209,7 +205,7 @@ func bread(r io.Reader, data ...interface{}) error {
 					return err
 				}
 				if len(v) != int(l1-1) || len(v) != int(l2-1) {
-					return fmt.Errorf("Protocol error: Proplist value length mismatch (len %d, arb len %d, value len %d)",
+					return fmt.Errorf("protocol error: Proplist value length mismatch (len %d, arb len %d, value len %d)",
 						l1, l2, len(v))
 				}
 				(*propList)[k] = v
@@ -236,7 +232,7 @@ func bread(r io.Reader, data ...interface{}) error {
 			} else if tt == falseTag {
 				*bptr = false
 			} else {
-				return fmt.Errorf("Protcol error: Got type %s but expected boolean true or false", tt)
+				return fmt.Errorf("protcol error: Got type %s but expected boolean true or false", tt)
 			}
 			continue
 		}

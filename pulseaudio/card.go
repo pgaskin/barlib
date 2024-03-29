@@ -58,6 +58,9 @@ func (c *Client) Cards() ([]Card, error) {
 		for i := uint32(0); i < portCount; i++ {
 			card.Ports[i].Card = &card
 			err = bread(b, &card.Ports[i])
+			if err != nil {
+				return nil, err
+			}
 		}
 		cards = append(cards, card)
 	}

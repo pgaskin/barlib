@@ -30,7 +30,7 @@ type Sink struct {
 	Ports              []sinkPort
 	ActivePortName     string
 	Formats            []formatInfo
-	Client				*Client
+	Client             *Client
 }
 
 // ReadFrom deserializes a sink packet from pulseaudio
@@ -100,7 +100,7 @@ func (s Sink) SetVolume(volume float32) error {
 	return err
 }
 
-func (s Sink) SetMute (b bool) error {
+func (s Sink) SetMute(b bool) error {
 	muteCmd := '0'
 	if b {
 		muteCmd = '1'
@@ -118,7 +118,7 @@ func (s Sink) IsMute() bool {
 }
 
 func (s Sink) GetVolume() float32 {
-	return float32(math.Round(float64(float32(s.Cvolume[0])/0xffff) * 100)) / 100
+	return float32(math.Round(float64(float32(s.Cvolume[0])/0xffff)*100)) / 100
 }
 
 // Sinks queries PulseAudio for a list of sinks and returns an array
@@ -140,6 +140,20 @@ func (c *Client) Sinks() ([]Sink, error) {
 	return sinks, nil
 }
 
+func (c *Client) GetSink(sinkName string) (Sink, error) {
+	var sink Sink
+	b, err := c.request(commandGetSinkInfo, uint32Tag, uint32(0xffffffff), stringTag, []byte(sinkName))
+	if err != nil {
+		return sink, err
+	}
+	err = bread(b, &sink)
+	if err != nil {
+		return sink, err
+	}
+	sink.Client = c
+	return sink, nil
+}
+
 func (c *Client) GetDefaultSink() (Sink, error) {
 	s, err := c.ServerInfo()
 	if err != nil {
@@ -149,12 +163,12 @@ func (c *Client) GetDefaultSink() (Sink, error) {
 	if err != nil {
 		return Sink{}, err
 	}
-	for _, sink := range sinks{
+	for _, sink := range sinks {
 		if sink.Name == s.DefaultSink {
 			return sink, nil
 		}
 	}
-	return Sink{}, errors2.New("Could not get default sink")
+	return Sink{}, errors2.New("could not get default sink")
 }
 
 type sinkPort struct {

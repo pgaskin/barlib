@@ -13,6 +13,9 @@ func (c *Client) Volume() (float32, error) {
 		return 0, err
 	}
 	sinks, err := c.Sinks()
+	if err != nil {
+		return 0, err
+	}
 	for _, sink := range sinks {
 		if sink.Name != s.DefaultSink {
 			continue
@@ -37,6 +40,37 @@ func (c *Client) SetSinkVolume(sinkName string, volume float32) error {
 
 func (c *Client) setSinkVolume(sinkName string, cvolume cvolume) error {
 	_, err := c.request(commandSetSinkVolume, uint32Tag, uint32(0xffffffff), stringTag, []byte(sinkName), byte(0), cvolume)
+	return err
+}
+
+func (c *Client) SetSourceVolume(sourceName string, volume float32) error {
+	return c.setSourceVolume(sourceName, cvolume{uint32(volume * 0xffff)})
+}
+
+func (c *Client) setSourceVolume(sourceName string, cvolume cvolume) error {
+	_, err := c.request(commandSetSourceVolume, uint32Tag, uint32(0xffffffff), stringTag, []byte(sourceName), byte(0), cvolume)
+	return err
+}
+
+func (c *Client) SetSinkMute(sinkName string, mute bool) error {
+	var v byte
+	if mute {
+		v = '1'
+	} else {
+		v = '0'
+	}
+	_, err := c.request(commandSetSinkMute, uint32Tag, uint32(0xffffffff), stringTag, []byte(sinkName), byte(0), uint8(v))
+	return err
+}
+
+func (c *Client) SetSourceMute(sourceName string, mute bool) error {
+	var v byte
+	if mute {
+		v = '1'
+	} else {
+		v = '0'
+	}
+	_, err := c.request(commandSetSourceMute, uint32Tag, uint32(0xffffffff), stringTag, []byte(sourceName), byte(0), uint8(v))
 	return err
 }
 

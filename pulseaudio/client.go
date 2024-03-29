@@ -1,12 +1,3 @@
-// Package pulseaudio is a pure-Go (no libpulse) implementation of the PulseAudio native protocol.
-//
-// Package pulseaudio is a pure-Go (no libpulse) implementation of the PulseAudio native protocol.
-
-// This library is a fork of https://github.com/mafik/pulseaudio
-// The original library deliberately tries to hide pulseaudio internals and doesn't expose them.
-
-// For my usecase I needed the exact opposite, access to pulseaudio internals.
-
 package pulseaudio
 
 import (
@@ -105,7 +96,7 @@ func (c *Client) processPackets() {
 			}
 			n := binary.BigEndian.Uint32(b.Bytes())
 			if n > frameSizeMaxAllow {
-				err = fmt.Errorf("Response size %d is too long (only %d allowed)", n, frameSizeMaxAllow)
+				//err = fmt.Errorf("response size %d is too long (only %d allowed)", n, frameSizeMaxAllow)
 				break
 			}
 			b.Grow(int(n) + 20)
@@ -235,7 +226,7 @@ func (c *Client) request(cmd command, args ...interface{}) (*bytes.Buffer, error
 		return nil, err
 	}
 	if b.Len() > frameSizeMaxAllow {
-		return nil, fmt.Errorf("Request size %d is too long (only %d allowed)", b.Len(), frameSizeMaxAllow)
+		return nil, fmt.Errorf("request size %d is too long (only %d allowed)", b.Len(), frameSizeMaxAllow)
 	}
 	responseChan := make(chan packetResponse)
 
@@ -355,16 +346,16 @@ func RuntimePath(fn string) (string, error) {
 
 	if xdgdir := os.Getenv("XDG_RUNTIME_DIR"); xdgdir != "" {
 		if exists(xdgdir) {
-			return filepath.Join(xdgdir, "/pulse/", fn), nil
+			return filepath.Join(xdgdir, "pulse", fn), nil
 		}
 	}
 
 	defaultxdg := fmt.Sprintf("/run/user/%d", os.Getuid())
 	if exists(defaultxdg) {
-		return filepath.Join(defaultxdg, "/pulse/", fn), nil
+		return filepath.Join(defaultxdg, "pulse", fn), nil
 	}
 
-	return "", fmt.Errorf("No valid directory for Pulse RuntimePath found")
+	return "", fmt.Errorf("no valid directory for Pulse RuntimePath found")
 }
 
 func cookiePath() (string, error) {
@@ -375,28 +366,28 @@ func cookiePath() (string, error) {
 	}
 
 	if confHome := os.Getenv("XDG_CONFIG_HOME"); confHome != "" {
-		cookie := filepath.Join(confHome, "/pulse/cookie")
+		cookie := filepath.Join(confHome, "pulse/cookie")
 		if exists(cookie) {
 			return cookie, nil
 		}
 	}
 
-	p = filepath.Join(os.Getenv("HOME"), "/.config/pulse/cookie")
+	p = filepath.Join(os.Getenv("HOME"), ".config/pulse/cookie")
 	if exists(p) {
 		return p, nil
 	}
 
-	p = filepath.Join(os.Getenv("HOME"), "/.pulse-cookie")
+	p = filepath.Join(os.Getenv("HOME"), ".pulse-cookie")
 	if exists(p) {
 		return p, nil
 	}
 
-	return "", fmt.Errorf("No valid path for Pulse cookie found")
+	return "", fmt.Errorf("no valid path for Pulse cookie found")
 }
 
 type Device interface {
 	SetVolume(volume float32) error
-	SetMute (b bool) error
+	SetMute(b bool) error
 	ToggleMute() error
 	IsMute() bool
 	GetVolume() float32
