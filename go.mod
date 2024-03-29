@@ -7,7 +7,6 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/jezek/xgb v1.1.0
 	github.com/mdlayher/wifi v0.1.0
 	github.com/nathan-osman/go-sunrise v1.1.0
 	github.com/tidwall/gjson v1.17.0
