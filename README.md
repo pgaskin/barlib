@@ -14,4 +14,4 @@ error-tolerant i3status replacements in Go.**
 
 #### Usage
 
-See [example_test.go](./example_test.go) for basic barlib usage.
+See [example_test.go](./example_test.go) for basic barlib usage, and [i3status-custom](./i3status-custom) for example modules I use myself.
