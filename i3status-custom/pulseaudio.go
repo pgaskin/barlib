@@ -274,7 +274,7 @@ func (c PulseAudio) Run(i barlib.Instance) error {
 							if event.Instance == "src_sel" {
 								srcDefIsMonitor := src[srcIdx].MonitorSourceName != ""
 								for {
-									if srcIdx++; snkIdx >= len(src) {
+									if srcIdx++; srcIdx >= len(src) {
 										srcIdx = 0
 									}
 									if srcDefIsMonitor || src[srcIdx].MonitorSourceName == "" {
