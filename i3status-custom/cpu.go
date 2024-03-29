@@ -29,7 +29,7 @@ func (c CPU) Run(i barlib.Instance) error {
 		expanded bool
 		prev     []cpuTime
 	)
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		if !i.IsStopped() {
 			var (
 				stats, err = getCPUTime()
@@ -86,7 +86,7 @@ func (c CPU) Run(i barlib.Instance) error {
 		}
 		for {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

@@ -25,9 +25,8 @@ type Memory struct {
 }
 
 func (c Memory) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
 	var expanded bool
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		if !i.IsStopped() {
 			stats, err := getMemInfo()
 			i.Update(isEvent, func(render barlib.Renderer) {
@@ -55,7 +54,7 @@ func (c Memory) Run(i barlib.Instance) error {
 		}
 		for {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

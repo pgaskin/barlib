@@ -19,8 +19,7 @@ type Time struct {
 }
 
 func (c Time) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
-	for {
+	for ticker := i.Tick(c.Interval); ; {
 		if !i.IsStopped() {
 			now := time.Now()
 			i.Update(false, func(render barlib.Renderer) {
@@ -33,7 +32,7 @@ func (c Time) Run(i barlib.Instance) error {
 			})
 		}
 		select {
-		case <-i.Ticked():
+		case <-ticker:
 		case <-i.Stopped():
 		}
 	}

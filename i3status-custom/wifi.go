@@ -25,7 +25,6 @@ type WiFi struct {
 }
 
 func (c WiFi) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
 	cl, err := wifi.New()
 	if err != nil {
 		return err
@@ -45,7 +44,7 @@ func (c WiFi) Run(i barlib.Instance) error {
 		throughput bool
 		state      = map[int]State{}
 	)
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		ifaces, err := cl.Interfaces()
 		if !i.IsStopped() || throughput {
 			for _, iface := range ifaces {
@@ -117,7 +116,7 @@ func (c WiFi) Run(i barlib.Instance) error {
 		}
 		for isEvent = false; ; {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

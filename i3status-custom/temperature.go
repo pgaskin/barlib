@@ -24,9 +24,8 @@ type Temperature struct {
 }
 
 func (c Temperature) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
 	var path string
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		if !i.IsStopped() {
 			if path == "" {
 				if ds, err := os.ReadDir("/sys/class/hwmon"); err == nil {
@@ -75,7 +74,7 @@ func (c Temperature) Run(i barlib.Instance) error {
 		}
 		for isEvent = false; ; {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

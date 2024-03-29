@@ -80,11 +80,12 @@ func (c CMUS) Run(i barlib.Instance) error {
 		view  uint64
 		state State
 	)
+	ticker := i.Tick(0)
 	for {
 		if state.object != nil && state.status == "Playing" && view >= 1 {
-			i.Tick(time.Second / 4)
+			i.TickReset(ticker, time.Second/4)
 		} else {
-			i.Tick(0)
+			i.TickReset(ticker, 0)
 		}
 		i.Update(true, func(render barlib.Renderer) {
 			if state.object == nil {
@@ -218,7 +219,7 @@ func (c CMUS) Run(i barlib.Instance) error {
 		})
 		for {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 				if state.object != nil {
 					if err := state.object.StoreProperty("org.mpris.MediaPlayer2.Player.Position", &state.position); err != nil {
 						return fmt.Errorf("position: %w", err)

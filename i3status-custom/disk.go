@@ -23,9 +23,8 @@ type Disk struct {
 }
 
 func (c Disk) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
 	var expanded bool
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		if !i.IsStopped() {
 			var stat unix.Statfs_t
 			err := unix.Statfs(c.Mountpoint, &stat)
@@ -58,7 +57,7 @@ func (c Disk) Run(i barlib.Instance) error {
 		}
 		for isEvent = false; ; {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

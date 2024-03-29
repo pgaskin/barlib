@@ -24,7 +24,6 @@ type Interfaces struct {
 }
 
 func (c Interfaces) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
 	type State struct {
 		View         uint64
 		Name         string
@@ -36,7 +35,7 @@ func (c Interfaces) Run(i barlib.Instance) error {
 		ThroughputRx float64
 	}
 	state := map[string]State{}
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		var ifaces []string
 		links, err := netlink.LinkList()
 		if err == nil {
@@ -119,7 +118,7 @@ func (c Interfaces) Run(i barlib.Instance) error {
 		}
 		for isEvent = false; ; {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

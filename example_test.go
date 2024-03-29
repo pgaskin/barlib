@@ -20,9 +20,7 @@ func (c Example) Run(i barlib.Instance) error {
 		count  int64
 		paused bool
 	)
-	i.Tick(c.Rate)
-
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Rate), false; ; {
 		i.Update(isEvent, func(render barlib.Renderer) {
 			var color uint32
 			if paused {
@@ -60,7 +58,7 @@ func (c Example) Run(i barlib.Instance) error {
 		select {
 		case <-i.Stopped():
 			i.Debug("stopped=%t", i.IsStopped())
-		case <-i.Ticked():
+		case <-ticker:
 			if !paused {
 				count += 1
 			}

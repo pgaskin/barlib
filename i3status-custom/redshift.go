@@ -39,7 +39,6 @@ func (c Redshift) Run(i barlib.Instance) error {
 	if c.TemperatureNight == 0 {
 		c.TemperatureNight = 4500
 	}
-	i.Tick(time.Second * 15)
 	conn, err := xgb.NewConn()
 	if err != nil {
 		return err
@@ -65,7 +64,7 @@ func (c Redshift) Run(i barlib.Instance) error {
 		override    bool
 		temperature int
 	)
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(time.Second*15), false; ; {
 		if !override {
 			elevation := sunrise.Elevation(c.Latitude, c.Longitude, time.Now())
 
@@ -116,7 +115,7 @@ func (c Redshift) Run(i barlib.Instance) error {
 				if err != nil {
 					return err
 				}
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				switch event.Button {

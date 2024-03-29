@@ -25,7 +25,6 @@ type Backlight struct {
 }
 
 func (c Backlight) Run(i barlib.Instance) error {
-	i.Tick(c.Interval)
 	conn, err := dbus.SystemBus()
 	if err != nil {
 		return err
@@ -34,7 +33,7 @@ func (c Backlight) Run(i barlib.Instance) error {
 		setErr       error
 		blCur, blMax uint32
 	)
-	for isEvent := false; ; {
+	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		if !i.IsStopped() {
 			blMax, err = readFileUint[uint32](filepath.Join("/sys/class", c.Subsystem, c.Name, "max_brightness"))
 			if err == nil {
@@ -67,7 +66,7 @@ func (c Backlight) Run(i barlib.Instance) error {
 		}
 		for isEvent = false; ; {
 			select {
-			case <-i.Ticked():
+			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
 				blPct := int(math.Round(float64(blCur) / float64(blMax) * 100))
