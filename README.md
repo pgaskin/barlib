@@ -1,5 +1,7 @@
 <h1 align="center">barlib</h1>
 
+<a href="https://pkg.go.dev/github.com/pgaskin/barlib"><img align="right" src="https://pkg.go.dev/badge/github.com/pgaskin/barlib" alt="PkgGoDev"></a>
+
 **A simple but flexible library for implementing efficient, fast, responsive, and
 error-tolerant i3status replacements in Go.**
 
