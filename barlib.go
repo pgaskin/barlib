@@ -464,7 +464,7 @@ func Main(tickRate time.Duration, modules ...Module) {
 			StopSignal:  stopSignal,
 			ContSignal:  contSignal,
 			ClickEvents: true,
-		}.AppendJSON(nil), `\n[[]\n`...))
+		}.AppendJSON(nil), "\n[[]\n"...))
 	}
 	for render := false; ; {
 		if render {
