@@ -13,6 +13,14 @@ error-tolerant i3status replacements in Go.**
 - Aligned ticks across all modules with customizable global base tick rate (so the bar sleeps for as long as possible between updates).
 - Update coalescing (so the bar updates all at once when multiple modules update at around the same time).
 - Implements [i3bar protocol](https://i3wm.org/docs/i3bar-protocol.html) version 1 for i3 v4.3+.
+- Unique sample module features not seen in other i3status implementations, like:
+  - DDC-CI monitor brightness/contrast control.
+  - Integrated display color temperature control.
+  - Multi-state modules.
+  - Battery charge limit display.
+  - Extremely powerful mouse-driven media player control.
+  - Automatic display layout presets.
+- Highly optimized event-driven pure-go modules which react properly to external changes.
 
 #### Usage
 
