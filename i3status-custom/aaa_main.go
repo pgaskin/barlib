@@ -56,6 +56,19 @@ func main() {
 			TemperatureNight: 3000,
 		},
 		XRandR{},
+		DDC{
+			Interval:   time.Minute,
+			ID:         "ACR2406-F2179101",
+			HideIfGone: true,
+			Brightness: true,
+			Contrast:   true,
+			Presets: [][2]uint16{
+				{0, 0},
+				{10, 10},
+				{45, 35},
+				{60, 60},
+			},
+		},
 		Battery{
 			Name: "BAT0",
 		},
