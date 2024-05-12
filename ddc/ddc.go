@@ -58,12 +58,12 @@ func (d *CI) GetVCP(vcp byte) (uint16, uint16, error) {
 	}
 	for retry := 0; retry < 5; retry++ {
 		buf, err := d.rx()
-		if err != nil {
-			return 0, 0, err
-		}
-		if len(buf) == 0 {
+		if errors.Is(err, ErrNoReply) || (err == nil && len(buf) == 0) {
 			d.next = time.Now().Add(time.Millisecond * 40)
 			continue
+		}
+		if err != nil {
+			return 0, 0, err
 		}
 		if len(buf) != 8 {
 			return 0, 0, fmt.Errorf("%w: unexpected ddc vcp response length %d", ErrBadReply, len(buf))
@@ -147,6 +147,9 @@ func (d *CI) rx() ([]byte, error) {
 		hdrAddr = hdr[0] >> 1
 		pktLen  = int(hdr[1] &^ 0x80)
 	)
+	if hdrAddr == 0 {
+		return nil, ErrNoReply
+	}
 	if hdrAddr != _I2C_ADDR_DDC_CI {
 		return nil, fmt.Errorf("bad ddc source address 0x%X", hdrAddr)
 	}
