@@ -61,6 +61,8 @@ func (c DDC) Run(i barlib.Instance) error {
 					} else if errors.Is(err, ddc.ErrDeviceGone) {
 						ci.Close()
 						ci = nil
+					} else if errors.Is(err, ddc.ErrNoReply) && hasBr {
+						// ignore, probably asleep, and we already know it works
 					} else {
 						return fmt.Errorf("get brightness: %w", err)
 					}
@@ -79,6 +81,8 @@ func (c DDC) Run(i barlib.Instance) error {
 					} else if errors.Is(err, ddc.ErrDeviceGone) {
 						ci.Close()
 						ci = nil
+					} else if errors.Is(err, ddc.ErrNoReply) && hasCn {
+						// ignore, probably asleep, and we already know it works
 					} else {
 						return fmt.Errorf("get contrast: %w", err)
 					}
