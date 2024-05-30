@@ -83,5 +83,20 @@ func FindI2C(card string) ([]int, error) {
 			}
 		}
 	}
+
+	if len(i2cs) == 0 {
+		cfs, err := os.ReadDir(filepath.Join("/sys/class/drm", card, "ddc", "i2c-dev"))
+		if err != nil {
+			return nil, err
+		}
+		for _, x := range cfs {
+			if s, ok := strings.CutPrefix(x.Name(), "i2c-"); ok {
+				if n, err := strconv.ParseInt(s, 10, 0); err == nil {
+					i2cs = append(i2cs, int(n))
+				}
+			}
+		}
+	}
+
 	return i2cs, nil
 }
