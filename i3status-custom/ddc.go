@@ -26,6 +26,7 @@ type DDC struct {
 	Interval   time.Duration // interval to sync current value or probe for monitor
 	ID         string        // see [ddc.FindMonitor]
 	HideIfGone bool          // instead of showing an error
+	Blind      bool          // do not poll, only set (for broken ddc implementations)
 	Brightness bool          // whether to show brightness (if present)
 	Contrast   bool          // whether to show contrast (if present)
 	Presets    [][2]uint16   // brightness/contrast presets to toggle through on click
@@ -51,6 +52,9 @@ func (c DDC) Run(i barlib.Instance) error {
 			if ci != nil && c.Brightness {
 				if brSkip {
 					brSkip = false
+				} else if c.Blind {
+					hasBr = true
+					brMax = 100
 				} else {
 					var err error
 					brCur, brMax, err = ci.GetVCP(ddc.VCP_Brightness)
@@ -71,6 +75,9 @@ func (c DDC) Run(i barlib.Instance) error {
 			if ci != nil && c.Contrast {
 				if cnSkip {
 					cnSkip = false
+				} else if c.Blind {
+					hasCn = true
+					cnMax = 100
 				} else {
 					var err error
 					cnCur, cnMax, err = ci.GetVCP(ddc.VCP_Contrast)
