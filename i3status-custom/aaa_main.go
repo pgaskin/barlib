@@ -80,7 +80,7 @@ func main() {
 		},
 		DDC{
 			Interval:   time.Minute,
-			ID:         "ACRE70C-9C5E5042",
+			ID:         "ACRE70C-00000000", //"ACRE70C-9C5E5042", (the Cable Matters 201376-BLK is nice but it doesn't pass the edid serial properly)
 			HideIfGone: true,
 			Blind:      true, // read seems to be broken (though windows works somehow)
 			Brightness: true,
