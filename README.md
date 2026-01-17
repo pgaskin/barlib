@@ -12,7 +12,8 @@ error-tolerant i3status replacements in Go.**
 - Bar stop/continue handling.
 - Aligned ticks across all modules with customizable global base tick rate (so the bar sleeps for as long as possible between updates).
 - Update coalescing (so the bar updates all at once when multiple modules update at around the same time).
-- Implements [i3bar protocol](https://i3wm.org/docs/i3bar-protocol.html) version 1 for i3 v4.3+.
+- Implements [i3bar protocol](https://i3wm.org/docs/i3bar-protocol.html) version 1 for [i3bar](https://github.com/i3/i3/tree/next/i3bar) v4.3+.
+- Compatible with [i3bar-river](https://github.com/MaxVerevkin/i3bar-river) and [swaybar](https://github.com/swaywm/sway/tree/master/swaybar) on wayland.
 - Unique sample module features not seen in other i3status implementations, like:
   - DDC-CI monitor brightness/contrast control.
   - Integrated display color temperature control.
@@ -21,6 +22,8 @@ error-tolerant i3status replacements in Go.**
   - Extremely powerful mouse-driven media player control.
   - Automatic display layout presets.
 - Highly optimized event-driven pure-go modules which react properly to external changes.
+
+The almost fully event-driven nature, synchronized ticks/updates, and unified socket connections across modules makes this implementation significantly more power-efficient than other alternatives like py3status, waybar, and i3status-rust.
 
 #### Usage
 
