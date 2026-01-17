@@ -224,9 +224,25 @@ func main() {
 		ThresholdColor: 0xFFFF00FF,
 	}, p1, s1, s2)
 
-	add(CPU{
-		Interval: time.Second * 3,
-	})
+	if is(s2) {
+		add(CPU{
+			Group: []int{
+				0: 1, // P
+				1: 1, // P
+				2: 1, // P
+				3: 1, // P
+				4: 2, // LPE
+				5: 2, // LPE
+				6: 2, // LPE
+				7: 2, // LPE
+			},
+			Interval: time.Second * 3,
+		})
+	} else {
+		add(CPU{
+			Interval: time.Second * 3,
+		})
+	}
 
 	add(Temperature{
 		Interval: time.Second * 3,

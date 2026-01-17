@@ -20,46 +20,67 @@ import (
 )
 
 type CPU struct {
+	Group    []int // [cpu]group (0 to skip)
 	Interval time.Duration
 }
 
 func (c CPU) Run(i barlib.Instance) error {
 	i.Tick(c.Interval)
+	var ngrp int
+	for _, g := range c.Group {
+		if g > 0 {
+			ngrp = max(ngrp, g)
+		}
+	}
 	var (
 		expanded bool
+		prevAgg  []cpuTime
 		prev     []cpuTime
 	)
+	if ngrp != 0 {
+		prevAgg = make([]cpuTime, ngrp)
+	} else {
+		prevAgg = make([]cpuTime, 1)
+	}
 	for ticker, isEvent := i.Tick(c.Interval), false; ; {
 		if !i.IsStopped() {
 			var (
-				stats, err = getCPUTime()
-				usage      = make([]float64, len(stats))
+				agg, cpus, err = getCPUTime()
+				usage          []float64
 			)
 			if err == nil {
-				if !expanded {
-					usage = usage[:1]
-				}
-				if len(prev) == len(stats) {
-					for i, cur := range stats {
-						if i >= len(usage) {
-							break
+				var grp []cpuTime
+				if ngrp != 0 {
+					grp = make([]cpuTime, ngrp)
+					for i, t := range cpus {
+						if i < len(c.Group) {
+							if g := c.Group[i]; g > 0 {
+								grp[g-1] = grp[g-1].Add(t)
+							}
 						}
-						// https://stackoverflow.com/a/23376195
-						var (
-							tmp   = prev[i]
-							idle1 = tmp.Idle + tmp.IOWait
-							idle2 = cur.Idle + cur.IOWait
-							rest1 = tmp.User + tmp.Nice + tmp.System + tmp.IRQ + tmp.SoftIRQ + tmp.Steal
-							rest2 = cur.User + cur.Nice + cur.System + cur.IRQ + cur.SoftIRQ + cur.Steal
-							tot1  = idle1 + rest1
-							tot2  = idle2 + rest2
-							totD  = tot2 - tot1
-							idleD = idle2 - idle1
-						)
-						usage[i] = (float64(totD) - float64(idleD)) / float64(totD)
 					}
 				}
-				prev = stats
+				if expanded {
+					if len(prev) == len(cpus) {
+						usage = make([]float64, len(cpus))
+						for i, cur := range cpus {
+							usage[i] = cur.Usage(prev[i])
+						}
+					}
+				} else if ngrp != 0 {
+					usage = make([]float64, ngrp)
+					for i, cur := range grp {
+						usage[i] = cur.Usage(prevAgg[i])
+					}
+				} else {
+					usage = []float64{agg.Usage(prevAgg[0])}
+				}
+				if ngrp != 0 {
+					prevAgg = grp
+				} else {
+					prevAgg[0] = agg
+				}
+				prev = cpus
 			}
 			i.Update(isEvent, func(render barlib.Renderer) {
 				if err != nil {
@@ -118,12 +139,41 @@ type cpuTime struct {
 	GuestNice uint64
 }
 
-func getCPUTime() ([]cpuTime, error) {
-	var time []cpuTime
+// https://stackoverflow.com/a/23376195
+func (t cpuTime) Usage(p cpuTime) float64 {
+	var (
+		idle1 = p.Idle + p.IOWait
+		idle2 = t.Idle + t.IOWait
+		rest1 = p.User + p.Nice + p.System + p.IRQ + p.SoftIRQ + p.Steal
+		rest2 = t.User + t.Nice + t.System + t.IRQ + t.SoftIRQ + t.Steal
+		tot1  = idle1 + rest1
+		tot2  = idle2 + rest2
+		totD  = tot2 - tot1
+		idleD = idle2 - idle1
+	)
+	return (float64(totD) - float64(idleD)) / float64(totD)
+}
+
+func (t cpuTime) Add(o cpuTime) cpuTime {
+	t.User += o.User
+	t.Nice += o.Nice
+	t.System += o.System
+	t.Idle += o.Idle
+	t.IOWait += o.IOWait
+	t.IRQ += o.IRQ
+	t.SoftIRQ += o.SoftIRQ
+	t.Steal += o.Steal
+	t.Guest += o.Guest
+	t.GuestNice += o.GuestNice
+	return t
+}
+
+func getCPUTime() (cpuTime, []cpuTime, error) {
 	buf, err := os.ReadFile("/proc/stat")
 	if err != nil {
-		return time, err
+		return cpuTime{}, nil, err
 	}
+	var time []cpuTime
 	sc := bufio.NewScanner(bytes.NewReader(buf))
 	for sc.Scan() {
 		line := sc.Text()
@@ -138,13 +188,13 @@ func getCPUTime() ([]cpuTime, error) {
 				var n int
 				if v := v[3:]; v != "" {
 					if v, err := strconv.ParseUint(v, 10, 64); err != nil {
-						return nil, fmt.Errorf("invalid cpu index %q", v)
+						return cpuTime{}, nil, fmt.Errorf("invalid cpu index %q", v)
 					} else {
 						n = int(v + 1)
 					}
 				}
 				if exp := len(time); exp != n {
-					return nil, fmt.Errorf("expected cpu %d, got %d", exp, n)
+					return cpuTime{}, nil, fmt.Errorf("expected cpu %d, got %d", exp, n)
 				}
 				continue
 			case 1:
@@ -171,12 +221,15 @@ func getCPUTime() ([]cpuTime, error) {
 				continue
 			}
 			if v, err := strconv.ParseUint(v, 10, 64); err != nil {
-				return nil, err
+				return cpuTime{}, nil, err
 			} else {
 				*out = v
 			}
 		}
 		time = append(time, t)
 	}
-	return time, sc.Err()
+	if len(time) < 2 {
+		return cpuTime{}, nil, fmt.Errorf("expected at least one CPU")
+	}
+	return time[0], time[1:], sc.Err()
 }
