@@ -1,6 +1,6 @@
 module github.com/pgaskin/barlib
 
-go 1.21.4
+go 1.26rc2
 
 require (
 	github.com/BurntSushi/xgb v0.0.0-20210121224620-deaf085860bc
