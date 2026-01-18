@@ -39,6 +39,7 @@ func (c Battery) Run(i barlib.Instance) error {
 			Energy                      float64
 			EnergyEmpty                 float64
 			EnergyFull                  float64
+			EnergyRate                  float64
 			Voltage                     float64
 			ChargeCycles                int32
 			TimeToEmpty                 int64
@@ -65,6 +66,9 @@ func (c Battery) Run(i barlib.Instance) error {
 			}
 			if err := obj.StoreProperty("org.freedesktop.UPower.Device.EnergyFull", &prop.EnergyFull); err != nil {
 				return fmt.Errorf("energy full: %w", err)
+			}
+			if err := obj.StoreProperty("org.freedesktop.UPower.Device.EnergyRate", &prop.EnergyRate); err != nil {
+				return fmt.Errorf("energy rate: %w", err)
 			}
 			if err := obj.StoreProperty("org.freedesktop.UPower.Device.Voltage", &prop.Voltage); err != nil {
 				return fmt.Errorf("voltage: %w", err)
@@ -112,10 +116,10 @@ func (c Battery) Run(i barlib.Instance) error {
 					} else {
 						threshold = "%"
 					}
-					block.FullText = fmt.Sprintf("%.1f%s %.1fV %d:%02d:%02d", percent, threshold, prop.Voltage, prop.TimeToFull/60/60, prop.TimeToFull/60%60, prop.TimeToFull%60)
+					block.FullText = fmt.Sprintf("%.1f%s %.1fV %.1fW %d:%02d:%02d", percent, threshold, prop.Voltage, prop.EnergyRate, prop.TimeToFull/60/60, prop.TimeToFull/60%60, prop.TimeToFull%60)
 					block.Color = 0x00FF00FF
 				case 2: // discharging
-					block.FullText = fmt.Sprintf("%.1f%% %.1fV %d:%02d:%02d", percent, prop.Voltage, prop.TimeToEmpty/60/60, prop.TimeToEmpty/60%60, prop.TimeToFull%60)
+					block.FullText = fmt.Sprintf("%.1f%% %.1fV %.1fW %d:%02d:%02d", percent, prop.Voltage, prop.EnergyRate, prop.TimeToEmpty/60/60, prop.TimeToEmpty/60%60, prop.TimeToFull%60)
 					block.Color = 0xFFFF00FF
 				case 3: // empty
 					block.FullText = fmt.Sprintf("%.1f%% %.1fV EMPTY", percent, prop.Voltage)
