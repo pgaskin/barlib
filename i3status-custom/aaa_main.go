@@ -267,6 +267,12 @@ func main() {
 		Index:    1,
 	}, s2)
 
+	add(Fan{
+		Interval: time.Second * 3,
+		Chip:     "thinkpad",
+		Index:    1,
+	}, s2)
+
 	add(Memory{
 		Interval:       time.Second * 3,
 		Threshold:      1 * 1024 * 1024 * 1024,
