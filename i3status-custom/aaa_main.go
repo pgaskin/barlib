@@ -278,7 +278,11 @@ func main() {
 		Color:       0x87CEEBFF,
 	})
 
-	add(Dunst{}, p1, d1)
+	if niri {
+		add(Mako{})
+	} else {
+		add(Dunst{})
+	}
 
 	barlib.Main(time.Second/4, mods...)
 }
