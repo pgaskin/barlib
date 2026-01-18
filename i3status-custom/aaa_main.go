@@ -224,6 +224,13 @@ func main() {
 		ThresholdColor: 0xFFFF00FF,
 	}, p1, s1, s2)
 
+	add(Disk{
+		Interval:       time.Second * 5,
+		Threshold:      10 * 1024 * 1024 * 1024,
+		ThresholdColor: 0xFFFF00FF,
+		Mountpoint:     "/home",
+	})
+
 	if is(s2) {
 		add(CPU{
 			Group: []int{
