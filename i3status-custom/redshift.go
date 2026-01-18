@@ -8,6 +8,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"time"
 
@@ -39,26 +40,50 @@ func (c Redshift) Run(i barlib.Instance) error {
 	if c.TemperatureNight == 0 {
 		c.TemperatureNight = 4500
 	}
-	conn, err := xgb.NewConn()
-	if err != nil {
-		return err
-	}
-	if err := randr.Init(conn); err != nil {
-		return err
-	}
-	for _, root := range xproto.Setup(conn).Roots {
-		if err := randr.SelectInputChecked(conn, root.Root, randr.NotifyMaskCrtcChange).Check(); err != nil {
+	var (
+		update func(float32, float32, float32) error
+		ch     <-chan error
+	)
+	if disp := os.Getenv("WAYLAND_DISPLAY"); disp != "" {
+		var close func()
+		var err error
+		update, close, ch, err = redshift.ColorRampWayland(disp)
+		if err != nil {
 			return err
 		}
-	}
-	ch := make(chan error, 1)
-	go func() {
-		var err error
-		for err == nil {
-			_, err = conn.WaitForEvent()
-			ch <- err
+		defer close()
+	} else {
+		conn, err := xgb.NewConn()
+		if err != nil {
+			return err
 		}
-	}()
+		defer conn.Close()
+
+		if err := randr.Init(conn); err != nil {
+			return err
+		}
+		for _, root := range xproto.Setup(conn).Roots {
+			if err := randr.SelectInputChecked(conn, root.Root, randr.NotifyMaskCrtcChange).Check(); err != nil {
+				return err
+			}
+		}
+
+		errCh := make(chan error)
+		go func() {
+			for {
+				_, err = conn.WaitForEvent()
+				if err != nil {
+					errCh <- err
+					return
+				}
+			}
+		}()
+
+		update = func(wr, wg, wb float32) error {
+			return redshift.ColorRampX11(conn, wr, wg, wb)
+		}
+		ch = errCh
+	}
 	var (
 		disabled    bool
 		override    bool
@@ -87,7 +112,7 @@ func (c Redshift) Run(i barlib.Instance) error {
 		} else {
 			wr, wg, wb, _ = redshift.WhitePoint(temperature)
 		}
-		if err := redshift.ColorRampX11(conn, wr, wg, wb); err != nil {
+		if err := update(wr, wg, wb); err != nil {
 			return err
 		}
 
@@ -112,9 +137,7 @@ func (c Redshift) Run(i barlib.Instance) error {
 		for isEvent = false; ; {
 			select {
 			case err := <-ch:
-				if err != nil {
-					return err
-				}
+				return err
 			case <-ticker:
 			case <-i.Stopped():
 			case event := <-i.Event():
