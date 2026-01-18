@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pgaskin/barlib"
@@ -19,7 +20,7 @@ import (
 type Fan struct {
 	Interval  time.Duration
 	Chip      string
-	Index     int
+	Sensor    string
 	HideIfOff bool
 }
 
@@ -29,12 +30,29 @@ func (c Fan) Run(i barlib.Instance) error {
 		if !i.IsStopped() {
 			if path == "" {
 				if ds, err := os.ReadDir("/sys/class/hwmon"); err == nil {
+				find:
 					for _, d := range ds {
-						if b, err := os.ReadFile(filepath.Join("/sys/class/hwmon", d.Name(), "name")); err == nil {
-							if string(bytes.TrimSpace(b)) == c.Chip {
-								path = filepath.Join("/sys/class/hwmon", d.Name(), "fan"+strconv.Itoa(c.Index)+"_input")
-								if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
-									path = ""
+						if strings.HasPrefix(d.Name(), "hwmon") {
+							if b, err := os.ReadFile(filepath.Join("/sys/class/hwmon", d.Name(), "name")); err == nil {
+								if string(bytes.TrimSpace(b)) == c.Chip {
+									if ds1, err := os.ReadDir(filepath.Join("/sys/class/hwmon", d.Name())); err == nil {
+										for _, d1 := range ds1 {
+											if !d1.IsDir() && strings.HasPrefix(d1.Name(), "fan") {
+												if d1b, ok := strings.CutSuffix(d1.Name(), "_input"); ok {
+													ok := c.Sensor == "" || d1b == c.Sensor
+													if !ok {
+														if b1, err := os.ReadFile(filepath.Join("/sys/class/hwmon", d.Name(), d1b+"_label")); err == nil {
+															ok = string(bytes.TrimSpace(b1)) == c.Sensor
+														}
+													}
+													if ok {
+														path = filepath.Join("/sys/class/hwmon/", d.Name(), d1.Name())
+														break find
+													}
+												}
+											}
+										}
+									}
 								}
 							}
 						}

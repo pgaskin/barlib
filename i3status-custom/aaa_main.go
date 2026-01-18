@@ -258,20 +258,18 @@ func main() {
 	add(Temperature{
 		Interval: time.Second * 3,
 		Chip:     "k10temp",
-		Index:    1,
-	}, p1, s1, d1)
+	}, d1)
 
 	add(Temperature{
 		Interval: time.Second * 3,
 		Chip:     "thinkpad",
-		Index:    1,
-	}, s2)
+		Sensor:   "CPU",
+	}, p1, s1, s2)
 
 	add(Fan{
 		Interval: time.Second * 3,
 		Chip:     "thinkpad",
-		Index:    1,
-	}, s2)
+	}, p1, s1, s2)
 
 	add(Memory{
 		Interval:       time.Second * 3,
