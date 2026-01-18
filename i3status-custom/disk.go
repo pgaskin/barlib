@@ -66,7 +66,11 @@ func (c Disk) Run(i barlib.Instance) error {
 				case 1:
 					isEvent = true
 				case 2:
-					go i3msg(`exec --no-startup-id gnome-disks`)
+					if niri {
+						nirimsg("action", "spawn", "--", "gnome-disks")
+					} else {
+						i3msg(`exec --no-startup-id gnome-disks`)
+					}
 					continue
 				case 3:
 					expanded = !expanded

@@ -92,7 +92,11 @@ func (c BluezDevice) Run(i barlib.Instance) error {
 						}
 					}
 				case 2:
-					i3msg(`exec --no-startup-id blueman-manager`)
+					if niri {
+						nirimsg("action", "spawn", "--", "blueman-manager")
+					} else {
+						i3msg(`exec --no-startup-id blueman-manager`)
+					}
 				}
 				continue
 			}

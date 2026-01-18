@@ -7,6 +7,7 @@ package main
 
 import (
 	"fmt"
+	"os/exec"
 	"strconv"
 	"time"
 
@@ -77,8 +78,9 @@ func (c CMUS) Run(i barlib.Instance) error {
 		position int64
 	}
 	var (
-		view  uint64
-		state State
+		view         uint64
+		state        State
+		lastShowHide time.Time
 	)
 	ticker := i.Tick(0)
 	for {
@@ -312,9 +314,17 @@ func (c CMUS) Run(i barlib.Instance) error {
 					continue
 				case 2:
 					if state.object == nil {
-						i3msg(`exec --no-startup-id xfce4-terminal --hide-scrollbar --hide-menubar --dynamic-title-mode none --title cmus --role cmus -e cmus`)
+						if niri {
+							nirimsg("action", "spawn", "--", "foot", "--app-id=cmus", "--window-size-chars=100x25", "cmus")
+						} else {
+							i3msg(`exec --no-startup-id xfce4-terminal --hide-scrollbar --hide-menubar --dynamic-title-mode none --title cmus --role cmus -e cmus`)
+						}
 					} else {
-						i3msg(`exec --no-startup-id killall -SIGHUP cmus`)
+						if niri {
+							nirimsg("action", "spawn", "--", "killall", "-SIGHUP", "cmus")
+						} else {
+							i3msg(`exec --no-startup-id killall -SIGHUP cmus`)
+						}
 					}
 					continue
 				case 3:
@@ -354,10 +364,21 @@ func (c CMUS) Run(i barlib.Instance) error {
 								return err
 							}
 						default:
-							if event.Button == 4 {
-								i3msg(`[window_role="^cmus$"] move scratchpad; [window_role="^cmus$"] scratchpad show`)
-							} else {
-								i3msg(`[window_role="^cmus$"] move scratchpad`)
+							if time.Since(lastShowHide) >= time.Millisecond*100 {
+								if niri {
+									if event.Button == 4 {
+										_, _ = exec.Command("sh", "-c", `niri msg action move-window-to-workspace $(niri msg --json workspaces | jq '.[] | select(.is_focused) | .idx') --window-id $(niri msg --json windows | jq '.[] | select(.app_id=="cmus") | .id')`).CombinedOutput()
+									} else {
+										_, _ = exec.Command("sh", "-c", `niri msg action move-window-to-workspace $(niri msg --json workspaces | jq 'max_by(.idx) | .idx + 1') --window-id $(niri msg --json windows | jq '.[] | select(.app_id=="cmus") | .id')`).CombinedOutput()
+									}
+								} else {
+									if event.Button == 4 {
+										i3msg(`[window_role="^cmus$"] move scratchpad; [window_role="^cmus$"] scratchpad show`)
+									} else {
+										i3msg(`[window_role="^cmus$"] move scratchpad`)
+									}
+								}
+								lastShowHide = time.Now()
 							}
 						}
 					}

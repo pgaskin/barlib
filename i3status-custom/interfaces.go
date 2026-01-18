@@ -125,7 +125,11 @@ func (c Interfaces) Run(i barlib.Instance) error {
 				default:
 					continue
 				case 2:
-					go i3msg(`exec --no-startup-id nm-connection-editor`)
+					if niri {
+						nirimsg("action", "spawn", "--", "nm-connection-editor")
+					} else {
+						i3msg(`exec --no-startup-id nm-connection-editor`)
+					}
 					continue
 				case 3, 4:
 					if s, ok := state[event.Instance]; ok {

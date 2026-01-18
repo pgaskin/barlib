@@ -225,7 +225,11 @@ func (c PulseAudio) Run(i barlib.Instance) error {
 								err = cl.SetSinkMute(s.Name, !s.Muted)
 							}
 						case 2:
-							go i3msg(`exec --no-startup-id pavucontrol --tab=3`)
+							if niri {
+								nirimsg("action", "spawn", "--", "pavucontrol", "--tab=3")
+							} else {
+								i3msg(`exec --no-startup-id pavucontrol --tab=3`)
+							}
 						case 3:
 							if snkExp = !snkExp; !snkExp {
 								snkSel = ""
@@ -264,7 +268,11 @@ func (c PulseAudio) Run(i barlib.Instance) error {
 								err = cl.SetSourceMute(s.Name, !s.Muted)
 							}
 						case 2:
-							go i3msg(`exec --no-startup-id pavucontrol --tab=4`)
+							if niri {
+								nirimsg("action", "spawn", "--", "pavucontrol", "--tab=4")
+							} else {
+								i3msg(`exec --no-startup-id pavucontrol --tab=4`)
+							}
 						case 3:
 							if srcExp = !srcExp; !srcExp {
 								srcSel = ""

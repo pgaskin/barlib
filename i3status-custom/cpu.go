@@ -116,7 +116,11 @@ func (c CPU) Run(i barlib.Instance) error {
 				case 1:
 					isEvent = true
 				case 2:
-					go i3msg(`exec --no-startup-id xfce4-terminal --hide-scrollbar --hide-menubar --dynamic-title-mode none --title htop -e 'htop --sort-key=PERCENT_CPU'`)
+					if niri {
+						nirimsg("action", "spawn", "--", "foot", "--app-id=htop", "--title=htop", "htop", "--sort-key=PERCENT_CPU")
+					} else {
+						i3msg(`exec --no-startup-id xfce4-terminal --hide-scrollbar --hide-menubar --dynamic-title-mode none --title htop -e 'htop --sort-key=PERCENT_CPU'`)
+					}
 				case 3:
 					expanded = !expanded
 				}
