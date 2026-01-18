@@ -3,6 +3,7 @@ module github.com/pgaskin/barlib
 go 1.26rc2
 
 require (
+	codeberg.org/tesselslate/wl v0.3.24
 	github.com/BurntSushi/xgb v0.0.0-20210121224620-deaf085860bc
 	github.com/bamiaux/rez v0.0.0-20170731184118-29f4463c688b
 	github.com/dustin/go-humanize v1.0.1
@@ -14,7 +15,7 @@ require (
 	github.com/vishvananda/netlink v1.1.0
 	go.i3wm.org/i3/v4 v4.21.0
 	golang.org/x/image v0.16.0
-	golang.org/x/sys v0.14.0
+	golang.org/x/sys v0.25.0
 )
 
 require (
