@@ -5,6 +5,7 @@
 package main
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,10 +19,11 @@ import (
 )
 
 type Backlight struct {
-	Interval  time.Duration
-	Subsystem string
-	Name      string
-	Separator bool
+	Interval    time.Duration
+	Subsystem   string
+	Name        string
+	SessionName string
+	Separator   bool
 }
 
 func (c Backlight) Run(i barlib.Instance) error {
@@ -91,7 +93,7 @@ func (c Backlight) Run(i barlib.Instance) error {
 				}
 				if blNew != blPct {
 					blCur = uint32(min(max(float64(blNew)/100, 0), 1) * float64(blMax))
-					setErr = conn.Object("org.freedesktop.login1", "/org/freedesktop/login1/session/self").Call("org.freedesktop.login1.Session.SetBrightness", 0, c.Subsystem, c.Name, blCur).Err
+					setErr = conn.Object("org.freedesktop.login1", dbus.ObjectPath("/org/freedesktop/login1/session/"+cmp.Or(c.SessionName, "auto"))).Call("org.freedesktop.login1.Session.SetBrightness", 0, c.Subsystem, c.Name, blCur).Err
 				}
 			}
 			break

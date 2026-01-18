@@ -87,15 +87,17 @@ func main() {
 	}, p1, s1, s2)
 
 	add(Backlight{
-		Interval:  time.Second * 5,
-		Subsystem: "backlight",
-		Name:      "amdgpu_bl1",
+		Interval:    time.Second * 5,
+		Subsystem:   "backlight",
+		Name:        "amdgpu_bl1",
+		SessionName: "self",
 	}, p1, s1)
 
 	add(Backlight{
-		Interval:  time.Second * 5,
-		Subsystem: "backlight",
-		Name:      "intel_backlight",
+		Interval:    time.Second * 5,
+		Subsystem:   "backlight",
+		Name:        "intel_backlight",
+		SessionName: "auto",
 	}, s2)
 
 	add(Redshift{
