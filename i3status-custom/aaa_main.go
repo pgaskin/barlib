@@ -174,6 +174,8 @@ func main() {
 		Name: "BAT0",
 	}, p1, s1, s2)
 
+	add(PowerProfiles{}, s2)
+
 	add(BluezDevice{
 		Label:   "\uf025",
 		Adapter: "hci0",
