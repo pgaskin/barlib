@@ -1,0 +1,3 @@
+wlproto/*.xml linguist-vendored
+wlproto/*.go linguist-generated
+wlproto/gen.go -linguist-generated

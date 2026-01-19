@@ -8,14 +8,11 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/BurntSushi/xgb"
-	"github.com/BurntSushi/xgb/randr"
-	"github.com/BurntSushi/xgb/xproto"
-	"github.com/nathan-osman/go-sunrise"
 	"github.com/pgaskin/barlib"
 	"github.com/pgaskin/barlib/barproto"
 	"github.com/pgaskin/barlib/redshift"
@@ -26,8 +23,8 @@ type Redshift struct {
 	Longitude        float64
 	ElevationDay     float64 // solar elevation in degrees for transition to daytime
 	ElevationNight   float64 // solar elevation in degrees for transition to night
-	TemperatureDay   float64
-	TemperatureNight float64
+	TemperatureDay   redshift.Temperature
+	TemperatureNight redshift.Temperature
 }
 
 func (c Redshift) Run(i barlib.Instance) error {
@@ -40,81 +37,31 @@ func (c Redshift) Run(i barlib.Instance) error {
 	if c.TemperatureNight == 0 {
 		c.TemperatureNight = 4500
 	}
-	var (
-		update func(float32, float32, float32) error
-		ch     <-chan error
-	)
-	if disp := os.Getenv("WAYLAND_DISPLAY"); disp != "" {
-		var close func()
-		var err error
-		update, close, ch, err = redshift.ColorRampWayland(disp)
-		if err != nil {
-			return err
-		}
-		defer close()
-	} else {
-		conn, err := xgb.NewConn()
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-
-		if err := randr.Init(conn); err != nil {
-			return err
-		}
-		for _, root := range xproto.Setup(conn).Roots {
-			if err := randr.SelectInputChecked(conn, root.Root, randr.NotifyMaskCrtcChange).Check(); err != nil {
-				return err
-			}
-		}
-
-		errCh := make(chan error)
-		go func() {
-			for {
-				_, err = conn.WaitForEvent()
-				if err != nil {
-					errCh <- err
-					return
-				}
-			}
-		}()
-
-		update = func(wr, wg, wb float32) error {
-			return redshift.ColorRampX11(conn, wr, wg, wb)
-		}
-		ch = errCh
+	m, fatal, err := redshift.New(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+		Level:     slog.LevelInfo,
+		AddSource: true,
+	})))
+	if err != nil {
+		return err
 	}
+	defer m.Close()
 	var (
 		disabled    bool
 		override    bool
-		temperature int
+		temperature redshift.Temperature
 	)
 	for ticker, isEvent := i.Tick(time.Second*15), false; ; {
 		if !override {
-			elevation := sunrise.Elevation(c.Latitude, c.Longitude, time.Now())
-
-			var progress float64
-			switch {
-			case elevation < c.ElevationNight:
-				progress = 0
-			case elevation >= c.ElevationDay:
-				progress = 1
-			default:
-				progress = (c.ElevationNight - elevation) / (c.ElevationNight - c.ElevationDay)
-			}
-			temperature = int((1-progress)*float64(c.TemperatureNight) + progress*float64(c.TemperatureDay))
+			temperature = redshift.Solar(time.Now(), c.Latitude, c.Longitude, c.ElevationNight, c.ElevationDay, c.TemperatureNight, c.TemperatureDay)
 		}
-		temperature = min(max(temperature, 1000), 25000)
 
-		var wr, wg, wb float32
+		var white redshift.WhitePoint
 		if disabled {
-			wr, wg, wb = 1, 1, 1
+			white = redshift.WhitePoint{1, 1, 1}
 		} else {
-			wr, wg, wb, _ = redshift.WhitePoint(temperature)
+			white, _ = redshift.GetWhitePoint(temperature)
 		}
-		if err := update(wr, wg, wb); err != nil {
-			return err
-		}
+		m.Set(white)
 
 		i.Update(isEvent, func(render barlib.Renderer) {
 			block := barproto.Block{
@@ -124,7 +71,7 @@ func (c Redshift) Run(i barlib.Instance) error {
 			if disabled {
 				block.FullText = "----K"
 			} else {
-				block.FullText = strconv.Itoa(temperature) + "K"
+				block.FullText = strconv.Itoa(int(temperature)) + "K"
 			}
 			if disabled {
 				block.Color = 0xFFFF00FF
@@ -136,7 +83,7 @@ func (c Redshift) Run(i barlib.Instance) error {
 
 		for isEvent = false; ; {
 			select {
-			case err := <-ch:
+			case err := <-fatal:
 				return err
 			case <-ticker:
 			case <-i.Stopped():

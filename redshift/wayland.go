@@ -3,267 +3,237 @@
 package redshift
 
 import (
-	"errors"
 	"fmt"
-	"runtime"
+	"log/slog"
 	"unsafe"
 
-	"codeberg.org/tesselslate/wl"
-	"github.com/pgaskin/barlib/wayland"
-	"github.com/pgaskin/barlib/wayland/zwlr"
+	"github.com/friedelschoen/wayland"
+	"github.com/pgaskin/barlib/wlproto"
 	"golang.org/x/sys/unix"
 )
 
-// TODO: debug log output?
+// wlManager manages gamma ramps for Wayland displays using
+// wlr_gamma_control_unstable_v1. It is safe for concurrent usage.
+type wlManager struct {
+	conn   *wayland.Conn
+	errch  chan error
+	logger *slog.Logger
 
-// ColorRampWayland connects to the specified wayland display to set the white
-// point for all outputs. If update returns an error, it is fatal. Only one
-// application may manage the gamma ramps at a time (otherwise it will fail
-// silently).
-//
-//	update, close, errCh, err := redshift.ColorRampWayland("")
-//	if err != nil {
-//		panic(err)
-//	}
-//	defer close()
-//
-//	go func() {
-//		if err := <-errCh; err != nil {
-//			panic(err)
-//		}
-//	}()
-//
-//	for {
-//		var temp int
-//		if _, err := fmt.Scanf("%d", &temp); err != nil {
-//			if err == io.EOF {
-//				break
-//			}
-//			panic(err)
-//		}
-//		wr, wg, wb, ok := redshift.WhitePoint(temp)
-//		if !ok {
-//			fmt.Println("bad")
-//			continue
-//		}
-//		update(wr, wg, wb)
-//	}
-func ColorRampWayland(display string) (update func(whiteR, whiteG, whiteB float32) error, closeConn func(), errCh <-chan error, err error) {
+	display  *wlproto.WlDisplay
+	registry *wlproto.WlRegistry
+	manager  *wlproto.ZwlrGammaControlManagerV1 // may be nil
+	outputs  map[uint32]*wlOutputState
+
+	white *WhitePoint
+}
+
+type wlOutputState struct {
+	object  uint32
+	output  *wlproto.WlOutput
+	control *wlproto.ZwlrGammaControlV1 // may be nil
+	size    uint32                      // may be zero
+
+	white *WhitePoint
+}
+
+// NewWayland opens a Wayland connection to the specified display (empty for the
+// default), processing events in another goroutine. If a connection error is
+// encountered after the initial connection, it may be logged with [log.Printf]
+// by the underlying library. If a fatal error occurs, the chan will return it,
+// and the connection should be closed as it will no longer be usable. If logger
+// is not nil, it is used for debug logs from this package.
+func NewWayland(display string, logger *slog.Logger) (Manager, <-chan error, error) {
+	if logger == nil {
+		logger = slog.New(slog.DiscardHandler)
+	}
+
 	conn, err := wayland.Connect(display)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	gc := wlGammaControlNew(conn)
+	// note: Connect starts a goroutine to dispatch events, which are all called
+	// synchronously, so as long as we do everything in event handlers, we don't
+	// need to worry about locking or consistency (and message writes are
+	// goroutine-safe since they lock the socket)
 
-	ch := make(chan error)
-	go func() {
-		ch <- conn.Closed()
-	}()
-	update = func(whiteR, whiteG, whiteB float32) error {
-		return conn.Enqueue(func() error {
-			return gc.SetWhitePointLocked(whiteR, whiteG, whiteB)
-		})
-	}
-	closeConn = func() {
-		conn.Close()
-	}
-	return update, closeConn, ch, nil
-}
+	e := make(chan error, 1)
+	m := &wlManager{conn: conn, errch: e, logger: logger}
 
-type wlGammaControl struct {
-	conn    *wayland.Connection
-	manager *zwlr.GammaControlManagerV1
-	outputs map[uint32]*wlGammaControlOutput
-
-	wr, wg, wb float32
-	wok        bool
-}
-
-func wlGammaControlNew(conn *wayland.Connection) *wlGammaControl {
-	ctx := &wlGammaControl{
-		conn:    conn,
-		outputs: make(map[uint32]*wlGammaControlOutput),
-	}
-	conn.Registry(wl.RegistryListener{
-		Global:       ctx.registryGlobal,
-		GlobalRemove: ctx.registryGlobalRemove,
-	})
-	return ctx
-}
-
-func (ctx *wlGammaControl) SetWhitePointLocked(wr, wg, wb float32) error {
-	ctx.wr, ctx.wg, ctx.wb, ctx.wok = wr, wg, wb, true
-	return ctx.applyLocked()
-}
-
-func (ctx *wlGammaControl) registryGlobal(data any, self wl.Registry, name uint32, iface string, version uint32) error {
-	return ctx.conn.Do(func() error {
-		switch iface {
-		case zwlr.GammaControlManagerV1Interface.Name:
-			//fmt.Println("got gcm")
-			ctx.manager = new(zwlr.GammaControlManagerV1(self.Bind(name, &zwlr.GammaControlManagerV1Interface, version)))
-
-		case wl.OutputInterface.Name:
-			// defer it to ensure we've had the chance to initialize gcm first
-			go ctx.conn.Enqueue(func() error {
-				//fmt.Println("got output", name)
-				if ctx.manager == nil {
-					return errors.New("no gamma control manager")
-				}
-				octx := wlGammaControlOutputNew(ctx.conn, wl.Output(self.Bind(name, &wl.OutputInterface, version)), *ctx.manager)
-				if ctx.wok {
-					if err := octx.SetWhitePointLocked(ctx.wr, ctx.wg, ctx.wb); err != nil {
-						octx.DestroyLocked()
-						return err
-					}
-				}
-				ctx.outputs[name] = octx
-				return nil
-			})
-		}
-		return nil
-	})
-}
-
-func (ctx *wlGammaControl) registryGlobalRemove(data any, self wl.Registry, name uint32) error {
-	return ctx.conn.Do(func() error {
-		if octx, ok := ctx.outputs[name]; ok {
-			// fmt.Println("removing output", name)
-			octx.DestroyLocked()
-			delete(ctx.outputs, name)
-		}
-		return nil
-	})
-}
-func (ctx *wlGammaControl) applyLocked() error {
-	if ctx.wok {
-		for _, octx := range ctx.outputs {
-			if err := octx.SetWhitePointLocked(ctx.wr, ctx.wg, ctx.wb); err != nil {
-				return err
+	m.display = wlproto.NewWlDisplay(&wlproto.WlDisplayHandlers{
+		OnError: wlHandler(func(e *wlproto.WlDisplayErrorEvent) bool {
+			if m.errch != nil {
+				defer close(m.errch)
+				m.errch <- fmt.Errorf("object %d: error %d: %s", e.ObjectID().ID(), e.Code(), e.Message())
+				m.errch = nil
 			}
+			return true
+		}),
+		OnDeleteID: wlHandler(func(e *wlproto.WlDisplayDeleteIDEvent) bool {
+			return m.conn.UnregisterEvent(e)
+		}),
+	})
+	m.conn.Register(m.display)
+
+	m.manager = nil
+	m.outputs = make(map[uint32]*wlOutputState)
+
+	// would use [wayland.Registrar], but it doesn't handle multiple instances
+	// of objects and notifying when they're added or removed
+	m.registry = m.display.GetRegistry(&wlproto.WlRegistryHandlers{
+		OnGlobal: wlHandler(func(e *wlproto.WlRegistryGlobalEvent) bool {
+			m.logger.Debug("registry: object added", "object", e.Name(), "interface", e.Interface(), "version", e.Version())
+
+			if e.Interface() == new(wlproto.ZwlrGammaControlManagerV1).Name() {
+				if m.manager != nil {
+					m.logger.Warn("registry: wtf: got multiple gamma control managers?")
+					return true
+				}
+
+				m.manager = wlproto.NewZwlrGammaControlManagerV1()
+				m.conn.Register(m.manager)
+				m.registry.Bind(e.Name(), e.Interface(), e.Version(), m.manager)
+				m.logger.Info("registry: bound gamma control manager")
+
+				for _, s := range m.outputs {
+					m.bindControl(s)
+					m.applyOutput(s)
+				}
+				return true
+			}
+
+			if e.Interface() == new(wlproto.WlOutput).Name() {
+				s := new(wlOutputState)
+				s.object = e.Name()
+				s.output = wlproto.NewWlOutput(&wlproto.WlOutputHandlers{})
+				m.conn.Register(s.output)
+				m.outputs[e.Name()] = s
+				m.registry.Bind(e.Name(), e.Interface(), e.Version(), s.output)
+				m.logger.Info("registry: detected new output", "object", e.Name())
+
+				m.bindControl(s)
+				m.applyOutput(s)
+			}
+
+			return true
+		}),
+		OnGlobalRemove: wlHandler(func(e *wlproto.WlRegistryGlobalRemoveEvent) bool {
+			m.logger.Debug("registry: object removed", "object", e.Name())
+			if m.manager != nil && m.manager.ID() == e.Name() {
+				m.manager.Destroy()
+				m.manager = nil
+				m.logger.Warn("registry: lost gamma control manager")
+				return true
+			}
+			if s, ok := m.outputs[e.Name()]; ok {
+				if s.control != nil {
+					s.control.Destroy()
+					s.control = nil
+				}
+				if s.output != nil {
+					s.output.Destroy()
+					s.output = nil
+				}
+				delete(m.outputs, e.Name())
+				m.logger.Info("registry: output removed", "object", e.Name())
+				return true
+			}
+			return true
+		}),
+	})
+
+	m.sync(nil)
+
+	return m, e, nil
+}
+
+func (m *wlManager) Close() {
+	m.conn.Close()
+}
+
+// sync waits for all requests to complete and events to be processed, then
+// calls fn, if non-nil, in the event goroutine, waiting for it to complete.
+func (m *wlManager) sync(fn func()) {
+	done := make(chan struct{})
+	m.display.Sync(&wlproto.WlCallbackHandlers{
+		OnDone: wayland.EventHandlerFunc[*wlproto.WlCallbackDoneEvent](func(_ *wlproto.WlCallbackDoneEvent) bool {
+			if fn != nil {
+				fn()
+			}
+			done <- struct{}{}
+			return true
+		}),
+	})
+	<-done
+}
+
+func (m *wlManager) Set(white WhitePoint) {
+	m.sync(func() {
+		m.white = new(white)
+		for _, s := range m.outputs {
+			m.applyOutput(s)
 		}
-	}
-	return nil
-}
-
-type wlGammaControlOutput struct {
-	conn    *wayland.Connection
-	output  wl.Output
-	control *zwlr.GammaControlV1
-
-	ramp       *wlGammaControlRamp
-	wr, wg, wb float32
-	wok        bool
-}
-
-func wlGammaControlOutputNew(conn *wayland.Connection, output wl.Output, manager zwlr.GammaControlManagerV1) *wlGammaControlOutput {
-	octx := &wlGammaControlOutput{
-		conn:    conn,
-		output:  output,
-		control: new(manager.GetGammaControl(output)),
-	}
-	octx.control.SetListener(zwlr.GammaControlV1Listener{
-		GammaSize: octx.gammaControlGammaSize,
-		Failed:    octx.gammaControlFailed,
-	}, nil)
-	return octx
-}
-
-func (octx *wlGammaControlOutput) SetWhitePointLocked(wr, wg, wb float32) error {
-	octx.wr, octx.wg, octx.wb, octx.wok = wr, wg, wb, true
-	return octx.applyLocked()
-}
-
-func (octx *wlGammaControlOutput) DestroyLocked() {
-	if octx.control != nil {
-		octx.control.Destroy()
-	}
-	*octx = wlGammaControlOutput{}
-}
-
-func (octx *wlGammaControlOutput) gammaControlGammaSize(data any, self zwlr.GammaControlV1, size uint32) error {
-	return octx.conn.Do(func() (err error) {
-		//fmt.Println("got gamma ramp size for output", size)
-		octx.ramp = nil
-		if size == 0 {
-			return nil
-		}
-		octx.ramp, err = wlGammaControlRampNew(int(size))
-		if err != nil {
-			return fmt.Errorf("create gamma ramp: %w", err)
-		}
-		return octx.applyLocked()
 	})
 }
 
-func (octx *wlGammaControlOutput) gammaControlFailed(data any, self zwlr.GammaControlV1) error {
-	return octx.conn.Do(func() error {
-		//fmt.Println("gamma control failed (is something else already controlling it for this output or was the output removed?)")
-		octx.control.Destroy()
-		octx.control = nil
-		return nil
+func (m *wlManager) bindControl(s *wlOutputState) {
+	if m.manager == nil {
+		return // not ready yet
+	}
+	if s.control != nil {
+		return // already have it
+	}
+	s.control = m.manager.GetGammaControl(s.output, &wlproto.ZwlrGammaControlV1Handlers{
+		OnGammaSize: wlHandler(func(e *wlproto.ZwlrGammaControlV1GammaSizeEvent) bool {
+			m.logger.Info("output: got gamma control", "object", s.object, "size", e.Size())
+			s.size = e.Size()
+			m.applyOutput(s)
+			return true
+		}),
+		OnFailed: wlHandler(func(e *wlproto.ZwlrGammaControlV1FailedEvent) bool {
+			s.control.Destroy()
+			s.control = nil
+			m.logger.Warn("output: lost gamma control (was the output removed or is another application controlling it?)", "object", s.object)
+			return true
+		}),
 	})
+	m.logger.Info("output: getting gamma control", "object", s.object)
 }
 
-func (octx *wlGammaControlOutput) applyLocked() error {
-	if !octx.wok || octx.ramp == nil || octx.control == nil {
-		return nil
+func (m *wlManager) applyOutput(s *wlOutputState) {
+	if m.white == nil || s.control == nil || s.size == 0 {
+		return // not ready yet
 	}
-	if err := octx.ramp.Set(octx.wr, octx.wg, octx.wb); err != nil {
-		return fmt.Errorf("set gamma ramp: %w", err)
+	if s.white != nil && s.white == m.white {
+		return // already attempted to apply this ramp (note: control is exclusive, so nothing could have changed it behind our backs)
 	}
-	octx.ramp.Apply(*octx.control)
-	return nil
+	s.white = m.white
+
+	SetWayland(s.control, s.size, *s.white)
 }
 
-type wlGammaControlRamp struct {
-	_    noCopy
-	fd   int
-	size int
-}
+func SetWayland(control *wlproto.ZwlrGammaControlV1, size uint32, white WhitePoint) {
+	g := make([]uint16, size*3)
+	GammaRamp(g[size*0:size*1], g[size*1:size*2], g[size*2:size*3], white)
 
-func wlGammaControlRampNew(size int) (*wlGammaControlRamp, error) {
-	if size < 1 {
-		return nil, fmt.Errorf("invalid size")
-	}
-	fd, err := unix.Open("/dev/shm", unix.O_TMPFILE|unix.O_RDWR|unix.O_EXCL|unix.O_CLOEXEC, 0)
+	fd, err := unix.MemfdCreate("gammaramp", unix.MFD_CLOEXEC)
 	if err != nil {
-		return nil, fmt.Errorf("allocate shared memory: %w", err)
+		panic(err)
 	}
-	if err := unix.Ftruncate(fd, int64(size)*3*2); err != nil { // [3*size]uint16
-		unix.Close(fd)
-		return nil, fmt.Errorf("allocate shared memory: %w", err)
+	defer unix.Close(fd) // the SetGamma call blocks on sending the fd, so this is fine
+
+	if _, err := unix.Pwrite(fd, sliceBytes(g), 0); err != nil {
+		panic(err)
 	}
-	r := &wlGammaControlRamp{
-		fd:   fd,
-		size: size,
-	}
-	runtime.SetFinalizer(r, func(r *wlGammaControlRamp) {
-		unix.Close(r.fd)
-	})
-	return r, nil
+	control.SetGamma(fd)
 }
 
-func (r *wlGammaControlRamp) Apply(control zwlr.GammaControlV1) error {
-	if _, err := unix.Seek(r.fd, 0, unix.SEEK_SET); err != nil {
-		return fmt.Errorf("seek: %w", err)
-	}
-	control.SetGamma(r.fd) // note: if this fails, zwlr.GammaControlV1Listener.Failed will be called asynchronously
-	return nil
+func sliceBytes[T any](s []T) []byte {
+	d := unsafe.SliceData(s)
+	e := unsafe.Sizeof(*d)
+	return unsafe.Slice((*byte)(unsafe.Pointer(d)), cap(s)*int(e))[:len(s)*int(e)]
 }
 
-func (r *wlGammaControlRamp) Set(wr, wg, wb float32) error {
-	rr, rg, rb := ColorRamp[uint16](wr, wg, wb, r.size)
-	_, err := unix.Pwritev(r.fd, [][]byte{
-		unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(rr))), r.size*2),
-		unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(rg))), r.size*2),
-		unsafe.Slice((*byte)(unsafe.Pointer(unsafe.SliceData(rb))), r.size*2),
-	}, 0)
-	return err
+func wlHandler[T wayland.Event](fn func(T) bool) wayland.EventHandler {
+	return wayland.EventHandlerFunc[T](fn)
 }
-
-type noCopy struct{}
-
-func (*noCopy) Lock()   {}
-func (*noCopy) Unlock() {}
