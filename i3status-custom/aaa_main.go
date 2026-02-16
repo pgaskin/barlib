@@ -196,6 +196,18 @@ func main() {
 		Name:    "dev_F0_AE_66_B2_4E_95",
 	}, p1)
 
+	add(BluezDevice{
+		Label:   "\uf8cd",
+		Adapter: "hci0",
+		Name:    "dev_DF_78_76_F8_EC_1E", // M575S
+	}, s2)
+
+	add(BluezDevice{
+		Label:   "\uf11c",
+		Adapter: "hci0",
+		Name:    "dev_DC_93_71_31_A6_A5", // keyboard
+	}, s2)
+
 	add(Interfaces{
 		Interval: time.Second * 5,
 		Filter: func(iface string) bool {
