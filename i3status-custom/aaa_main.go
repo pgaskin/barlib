@@ -208,6 +208,12 @@ func main() {
 		Name:    "dev_DC_93_71_31_A6_A5", // keyboard
 	}, s2)
 
+	add(BluezDevice{
+		Label:   "\uf58f",
+		Adapter: "hci0",
+		Name:    "dev_B8_7B_D4_17_4B_0D", // pixel buds
+	}, p1, s2)
+
 	add(Interfaces{
 		Interval: time.Second * 5,
 		Filter: func(iface string) bool {
