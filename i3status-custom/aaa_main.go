@@ -205,7 +205,19 @@ func main() {
 	add(BluezDevice{
 		Label:   "\uf11c",
 		Adapter: "hci0",
-		Name:    "dev_DC_93_71_31_A6_A5", // keyboard
+		Name:    "dev_DC_93_71_31_A6_A5", // keyboard (logi)
+	}, s2)
+
+	add(BluezDevice{
+		Label:   "\uf8cd",
+		Adapter: "hci0",
+		Name:    "dev_E3_3A_E1_ED_1F_41", // M575
+	}, s2)
+
+	add(BluezDevice{
+		Label:   "\uf11c",
+		Adapter: "hci0",
+		Name:    "dev_E4_7E_3B_17_49_E1", // keyboard (keychron)
 	}, s2)
 
 	add(BluezDevice{
